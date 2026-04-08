@@ -31,6 +31,7 @@
 ** Required header files
 */
 #include "cfe_tbl_module_all.h"
+#include "cfe_tbl_codec.h"
 #include "cfe_version.h"
 #include "cfe_config.h" /* For version string construction */
 
@@ -410,6 +411,12 @@ CFE_Status_t CFE_TBL_LoadCmd(const CFE_TBL_LoadCmd_t *data)
         Status = CFE_TBL_ValidateFileIsLoadable(&Txn, &Header.Tbl);
     }
 
+    /* Reserve a working buffer (mirrors CFE_TBL_Load → ValidateLoadRequest before TxnLoadFromFile). */
+    if (Status == CFE_SUCCESS)
+    {
+        Status = CFE_TBL_ValidateLoadRequest(&Txn, CFE_TBL_SRC_FILE);
+    }
+
     if (Status == CFE_SUCCESS)
     {
         /* Read the file content into the working buffer */
@@ -420,6 +427,13 @@ CFE_Status_t CFE_TBL_LoadCmd(const CFE_TBL_LoadCmd_t *data)
     if (Status == CFE_SUCCESS)
     {
         CFE_TBL_SetMetaDataFromFileHeader(&Txn, LoadFilename, &Header.Std);
+
+        /* Finish the load pipeline (same as CFE_TBL_TxnLoadFromFile + CFE_TBL_Load API path). */
+        Status = CFE_TBL_CodecGetFinalStatus(&Txn, &Header.Tbl);
+        if (Status >= CFE_SUCCESS)
+        {
+            Status = CFE_TBL_ValidateLoadInProgress(&Txn, Status);
+        }
     }
 
     CFE_TBL_TxnFinish(&Txn);
